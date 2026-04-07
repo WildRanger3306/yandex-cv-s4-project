@@ -31,7 +31,8 @@ def main():
         torch_dtype=torch.float16,
         device_map="auto"
     )
-    processor = AutoProcessor.from_pretrained(model_id)
+    # Отключаем fast-процессор для совместимости с torch 2.2.0
+    processor = AutoProcessor.from_pretrained(model_id, use_fast=False)
 
     # Настройка промпта
     user_prompt = "Find all people NOT wearing a safety helmet. Return bounding boxes in format [ymin, xmin, ymax, xmax] for each."
