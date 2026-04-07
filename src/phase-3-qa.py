@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 
 RAW_DATA_DIR = Path("data/raw")
 PROCESSED_DIR = Path("data/processed")
-VQA_LABEL_FILE = PROCESSED_DIR / "vqa_labels_t4.json"
+VQA_LABEL_FILE = PROCESSED_DIR / "vqa_labels.json"
 OUTPUT_QA_IMAGE = PROCESSED_DIR / "qa_grid.jpg"
 
 def parse_boxes(text):

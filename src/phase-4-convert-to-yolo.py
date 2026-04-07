@@ -25,24 +25,32 @@ CLASSES = ["no_helmet"]
 
 def parse_boxes(text):
     """
-    Пытается извлечь координаты из JSON-подобного ответа Qwen.
-    Ожидаемый формат: [{"bbox_2d": [ymin, xmin, ymax, xmax], ...}]
+    Пытается извлечь координаты из ответа модели, даже если там есть рассуждения.
+    Ожидаемый формат: [...] внутри ```json или просто как список.
     """
     try:
-        # Пытаемся очистить текст от markdown-блоков, если они есть
-        clean_text = re.sub(r'```json|```', '', text).strip()
-        data = json.loads(clean_text)
-        
-        boxes = []
-        if isinstance(data, list):
-            for item in data:
-                if 'bbox_2d' in item:
-                    boxes.append(item['bbox_2d'])
-        return boxes
+        # 1. Сначала ищем блок ```json ... ```
+        json_match = re.search(r'```json\s*(\[.*?\])\s*```', text, re.DOTALL)
+        # 2. Если нет, ищем просто любую структуру [ ... ]
+        if not json_match:
+            json_match = re.search(r'(\[.*\])', text, re.DOTALL)
+            
+        if json_match:
+            data = json.loads(json_match.group(1))
+            boxes = []
+            if isinstance(data, list):
+                for item in data:
+                    if isinstance(item, dict) and 'bbox_2d' in item:
+                        boxes.append(item['bbox_2d'])
+                    elif isinstance(item, list) and len(item) == 4:
+                        boxes.append(item)
+            return boxes
     except Exception as e:
-        # Fallback на регулярки, если JSON невалиден
-        found_boxes = re.findall(r'\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]', text)
-        return [[int(x) for x in box] for box in found_boxes]
+        pass
+        
+    # Fallback на регулярки для поиска всех [y1, x1, y2, x2] в тексте
+    found_boxes = re.findall(r'\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]', text)
+    return [[int(x) for x in box] for box in found_boxes]
 
 def convert_to_yolo(box, img_w, img_h):
     """

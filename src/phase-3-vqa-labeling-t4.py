@@ -6,12 +6,15 @@ from pathlib import Path
 from PIL import Image
 
 # ПУТИ (Настройте под Colab)
-# ВАЖНО: Предполагается, что картинки лежат в data/raw/images/
 DATA_DIR = Path("data/raw/images")
 OUTPUT_FILE = "vqa_labels_improved.json"
 
-# МОДЕЛЬ
-MODEL_ID = "Qwen/Qwen2.5-VL-3B-Instruct"
+# ЛИМИТ - для тестового прогона берем 100 фото
+LIMIT = 100
+
+# МОДЕЛЬ - Переходим на 7B для повышения качества детекции
+# Она лучше видит мелкие детали и реже ошибается в классификации "каска/кепка"
+MODEL_ID = "Qwen/Qwen2.5-VL-7B-Instruct"
 
 def main():
     if not DATA_DIR.exists():
@@ -19,7 +22,8 @@ def main():
         return
 
     image_files = list(DATA_DIR.glob("*.png")) + list(DATA_DIR.glob("*.jpg"))
-    print(f"Total images found: {len(image_files)}")
+    image_files = sorted(image_files)[:LIMIT]
+    print(f"Total images to process (Test run): {len(image_files)}")
 
     # Инициализация vLLM (Для T4/L4 в Colab)
     # Используем float16 или bfloat16 (если L4)
@@ -38,11 +42,14 @@ def main():
         stop=["<|im_end|>"]
     )
 
-    # Уточненный промпт для детекции именно ГОЛОВ
-    prompt = ("<|im_start|>system\nYou are a helpful safety inspector. Your task is to detect workers' heads without helmets.<|im_end|>\n"
+    # Уточненный CoT промпт для 7B модели
+    prompt = ("<|im_start|>system\nYou are a professional safety inspector. Analyze the image step-by-step to identify safety violations. "
+              "Focus on worker's heads.<|im_end|>\n"
               "<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>"
-              "Detect all heads of workers in this image. For each head, check if it has a safety helmet. "
-              "Return bounding boxes in format [ymin, xmin, ymax, xmax] ONLY for those NOT wearing a helmet.<|im_end|>\n"
+              "1. Identify all people and their heads.\n"
+              "2. For each head, determine if they are wearing a safety helmet, a cap, or nothing.\n"
+              "3. List [xmin, ymin, xmax, ymax] boxes ONLY for heads WITHOUT a safety helmet.\n"
+              "Provide your reasoning first, then the JSON list of boxes.<|im_end|>\n"
               "<|im_start|>assistant\n")
 
     # Формируем батч запросов
@@ -53,7 +60,8 @@ def main():
             "multi_modal_data": {"image": Image.open(img_path).convert("RGB")}
         })
 
-    print("Starting Batch Inference via vLLM...")
+    print("Starting Batch Inference via vLLM (7B Model)...")
+    # Для 7B модели на T4 может потребоваться GPU memory utilization ~0.9
     outputs = llm.generate(prompts, sampling_params)
 
     # Собираем результаты
