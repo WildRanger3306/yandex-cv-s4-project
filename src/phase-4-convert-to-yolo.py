@@ -4,11 +4,12 @@ import random
 import re
 from pathlib import Path
 import shutil
+from PIL import Image
 
 # Пути
 RAW_DATA_DIR = Path("data/raw")
 PROCESSED_DIR = Path("data/processed")
-VQA_LABEL_FILE = PROCESSED_DIR / "vqa_labels_t4.json" # или vqa_labels.json
+VQA_LABEL_FILE = PROCESSED_DIR / "vqa_labels_t4.json" # Используем полный результат с Colab
 
 # Выходной датасет для YOLO
 YOLO_ROOT = Path("data/yolo_dataset")
@@ -43,13 +44,19 @@ def parse_boxes(text):
         found_boxes = re.findall(r'\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]', text)
         return [[int(x) for x in box] for box in found_boxes]
 
-def convert_to_yolo(box, img_w=1000, img_h=1000):
+def convert_to_yolo(box, img_w, img_h):
     """
-    VLM обычно возвращает координаты в масштабе 0-1000.
-    Конвертируем [ymin, xmin, ymax, xmax] -> [x_center, y_center, w, h] (нормализованные)
+    ПОДТВЕРЖДЕНО ЭКСПЕРИМЕНТОМ:
+    VLM возвращает [xmin, ymin, xmax, ymax] в ПИКСЕЛЯХ.
     """
-    ymin, xmin, ymax, xmax = box
+    xmin, ymin, xmax, ymax = box
     
+    # Ограничиваем координаты границами изображения
+    xmin = max(0, min(xmin, img_w))
+    xmax = max(0, min(xmax, img_w))
+    ymin = max(0, min(ymin, img_h))
+    ymax = max(0, min(ymax, img_h))
+
     # YOLO формат: x_center, y_center, width, height (нормализованные 0-1)
     w = (xmax - xmin) / img_w
     h = (ymax - ymin) / img_h
@@ -86,6 +93,10 @@ def main():
             if not src_path:
                 continue
                 
+            # 1. Получаем размеры картинки
+            with Image.open(src_path) as img:
+                img_w, img_h = img.size
+                
             dest_img = YOLO_ROOT / "images" / subset / img_name
             shutil.copy(src_path, dest_img)
             
@@ -97,8 +108,8 @@ def main():
             
             with open(label_file, "w") as f:
                 for box in boxes:
-                    # Qwen-VL выдает координаты в нормализованном пространстве 0-1000 по умолчанию
-                    yolo_box = convert_to_yolo(box)
+                    # Нормализуем по РЕАЛЬНОМУ размеру изображения
+                    yolo_box = convert_to_yolo(box, img_w, img_h)
                     # Формат: class_id x y w h
                     f.write(f"0 {' '.join([f'{c:.6f}' for c in yolo_box])}\n")
 
