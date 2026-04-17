@@ -210,3 +210,5 @@ __marimo__/
 data/raw
 data/processed
 data/yolo_dataset
+runs
+*.pt

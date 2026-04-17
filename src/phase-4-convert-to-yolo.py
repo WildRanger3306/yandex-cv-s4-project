@@ -9,7 +9,7 @@ from PIL import Image
 # Пути
 RAW_DATA_DIR = Path("data/raw")
 PROCESSED_DIR = Path("data/processed")
-VQA_LABEL_FILE = PROCESSED_DIR / "vqa_labels_t4.json" # Используем полный результат с Colab
+VQA_LABEL_FILE = PROCESSED_DIR / "vqa_labels_improved.json"
 
 # Выходной датасет для YOLO
 YOLO_ROOT = Path("data/yolo_dataset")

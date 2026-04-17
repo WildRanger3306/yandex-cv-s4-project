@@ -1,6 +1,11 @@
 import os
 from ultralytics import YOLO
 import mlflow
+from ultralytics import settings
+
+# Отключаем интеграции, которые не нужны
+settings.update({'clearml': False, 'comet': False, 'wandb': False})
+os.environ['REPORT_TO'] = 'mlflow'
 
 # НАСТРОЙКИ MLFLOW
 MLFLOW_TRACKING_URI = "http://188.243.201.66:5000/"  # Указано в задании
@@ -17,21 +22,20 @@ def main():
         print(f"Error: {DATA_YAML} not found! Run Phase 4 first.")
         return
 
-    # 2. Инициализируем YOLOv8n (Nano) или YOLOv8s (Small)
-    # На 1080 Ti (11Gb) можно смело брать 's' версию
-    model = YOLO("yolov8s.pt") 
+    # 2. Инициализируем YOLOv8m (Medium)
+    # На 1080 Ti (11Gb) она отлично поместится даже на 640px
+    model = YOLO("yolov8m.pt") 
 
     print(f"Starting training on device: {model.device}")
     
     # 3. Обучение с автоматическим логированием в MLFlow
-    # Ultralytics сам подхватывает MLFlow, если он установлен и URI задан
     results = model.train(
         data=DATA_YAML,
         epochs=50,
-        imgsz=416,
+        imgsz=640,
         batch=16,
         project=PROJECT_NAME,
-        name="v8s_vqa_labels",
+        name="v8m_vqa_labels_640",
         device=0, # Наша 1080 Ti
         patience=10, # Early stopping
         save=True,
